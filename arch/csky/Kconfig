@@ -1,5 +1,6 @@
 config CSKY
 	def_bool y
+	select ARCH_32BIT_OFF_T
 	select ARCH_HAS_SYNC_DMA_FOR_CPU
 	select ARCH_HAS_SYNC_DMA_FOR_DEVICE
 	select ARCH_USE_BUILTIN_BSWAP
@@ -28,10 +29,12 @@ config CSKY
 	select GENERIC_SCHED_CLOCK
 	select GENERIC_SMP_IDLE_THREAD
 	select HAVE_ARCH_TRACEHOOK
-	select HAVE_GENERIC_DMA_COHERENT
+	select HAVE_FUNCTION_TRACER
+	select HAVE_FUNCTION_GRAPH_TRACER
 	select HAVE_KERNEL_GZIP
 	select HAVE_KERNEL_LZO
 	select HAVE_KERNEL_LZMA
+	select HAVE_PERF_EVENTS
 	select HAVE_C_RECORDMCOUNT
 	select HAVE_DMA_API_DEBUG
 	select HAVE_DMA_CONTIGUOUS
@@ -39,8 +42,7 @@ config CSKY
 	select MODULES_USE_ELF_RELA if MODULES
 	select OF
 	select OF_EARLY_FLATTREE
-	select OF_RESERVED_MEM
-	select PERF_USE_VMALLOC
+	select PERF_USE_VMALLOC if CPU_CK610
 	select RTC_LIB
 	select TIMER_OF
 	select USB_ARCH_HAS_EHCI
@@ -93,6 +95,9 @@ config MMU
 config RWSEM_GENERIC_SPINLOCK
 	def_bool y
 
+config STACKTRACE_SUPPORT
+	def_bool y
+
 config TIME_LOW_RES
 	def_bool y
 
@@ -142,6 +147,19 @@ config CPU_CK860
 	select CPU_HAS_CACHEV2
 	select CPU_HAS_LDSTEX
 	select CPU_HAS_FPUV2
+endchoice
+
+choice
+	prompt "C-SKY PMU type"
+	depends on PERF_EVENTS
+	depends on CPU_CK807 || CPU_CK810 || CPU_CK860
+
+config CPU_PMU_NONE
+	bool "None"
+
+config CSKY_PMU_V1
+	bool "Performance Monitoring Unit Ver.1"
+
 endchoice
 
 choice
@@ -197,6 +215,15 @@ config RAM_BASE
 	hex "DRAM start addr (the same with memory-section in dts)"
 	default 0x0
 
+config HOTPLUG_CPU
+	bool "Support for hot-pluggable CPUs"
+	select GENERIC_IRQ_MIGRATION
+	depends on SMP
+	help
+	  Say Y here to allow turning CPUs off and on. CPUs can be
+	  controlled through /sys/devices/system/cpu/cpu1/hotplug/target.
+
+	  Say N if you want to disable CPU hotplug.
 endmenu
 
 source "kernel/Kconfig.hz"

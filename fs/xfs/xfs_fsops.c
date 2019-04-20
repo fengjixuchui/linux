@@ -40,7 +40,6 @@ xfs_growfs_data_private(
 	xfs_rfsblock_t		new;
 	xfs_agnumber_t		oagcount;
 	xfs_trans_t		*tp;
-	LIST_HEAD		(buffer_list);
 	struct aghdr_init_data	id = {};
 
 	nb = in->newblocks;
@@ -534,6 +533,7 @@ xfs_fs_reserve_ag_blocks(
 	int			error = 0;
 	int			err2;
 
+	mp->m_finobt_nores = false;
 	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++) {
 		pag = xfs_perag_get(mp, agno);
 		err2 = xfs_ag_resv_init(pag, NULL);
