@@ -539,6 +539,7 @@ cifs_autodisable_serverino(struct cifs_sb_info *cifs_sb)
 			tcon = cifs_sb_master_tcon(cifs_sb);
 
 		cifs_sb->mnt_cifs_flags &= ~CIFS_MOUNT_SERVER_INUM;
+		cifs_sb->mnt_cifs_serverino_autodisabled = true;
 		cifs_dbg(VFS, "Autodisabling the use of server inode numbers on %s.\n",
 			 tcon ? tcon->treeName : "new server");
 		cifs_dbg(VFS, "The server doesn't seem to support them properly or the files might be on different servers (DFS).\n");
@@ -789,6 +790,11 @@ cifs_aio_ctx_alloc(void)
 {
 	struct cifs_aio_ctx *ctx;
 
+	/*
+	 * Must use kzalloc to initialize ctx->bv to NULL and ctx->direct_io
+	 * to false so that we know when we have to unreference pages within
+	 * cifs_aio_ctx_release()
+	 */
 	ctx = kzalloc(sizeof(struct cifs_aio_ctx), GFP_KERNEL);
 	if (!ctx)
 		return NULL;
@@ -807,7 +813,23 @@ cifs_aio_ctx_release(struct kref *refcount)
 					struct cifs_aio_ctx, refcount);
 
 	cifsFileInfo_put(ctx->cfile);
-	kvfree(ctx->bv);
+
+	/*
+	 * ctx->bv is only set if setup_aio_ctx_iter() was call successfuly
+	 * which means that iov_iter_get_pages() was a success and thus that
+	 * we have taken reference on pages.
+	 */
+	if (ctx->bv) {
+		unsigned i;
+
+		for (i = 0; i < ctx->npages; i++) {
+			if (ctx->should_dirty)
+				set_page_dirty(ctx->bv[i].bv_page);
+			put_page(ctx->bv[i].bv_page);
+		}
+		kvfree(ctx->bv);
+	}
+
 	kfree(ctx);
 }
 
@@ -938,7 +960,6 @@ cifs_alloc_hash(const char *name,
 	}
 
 	(*sdesc)->shash.tfm = *shash;
-	(*sdesc)->shash.flags = 0x0;
 	return 0;
 }
 
